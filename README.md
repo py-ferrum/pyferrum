@@ -19,6 +19,10 @@ pyferrum supports **CPython 3.10 and newer**. Its abi3 extension targets
 CPython 3.8, while CI tests every supported minor version from 3.10 through
 3.15. PyPy is not a supported runtime.
 
+Releases provide prebuilt wheels for Linux and Windows, but not macOS. On
+macOS, `pip` builds the extension from source, so install Rust with Cargo and
+the Xcode Command Line Tools first (`xcode-select --install`).
+
 ```bash
 python -m pip install pyferrum
 ```

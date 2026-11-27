@@ -15,6 +15,9 @@ for building the native extension. Use a virtual environment for Python tools
 and packages. Keep Cargo build output inside the environment if you want to
 avoid workspace build artifacts:
 
+On macOS, install the Xcode Command Line Tools with `xcode-select --install`
+before building.
+
 ```bash
 git clone https://github.com/py-ferrum/pyferrum.git
 cd pyferrum
