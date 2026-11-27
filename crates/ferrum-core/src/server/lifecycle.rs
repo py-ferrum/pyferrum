@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio::time::timeout;
+use tokio_rustls::rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 use tokio_rustls::TlsAcceptor;
 use tracing::{error, info, warn};
 
@@ -183,7 +184,7 @@ fn load_tls_acceptor(config: &ServerConfig) -> std::io::Result<Option<TlsAccepto
     };
 
     let mut cert_reader = BufReader::new(File::open(cert_file)?);
-    let certs = rustls_pemfile::certs(&mut cert_reader)
+    let certs = CertificateDer::pem_reader_iter(&mut cert_reader)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
     if certs.is_empty() {
@@ -194,12 +195,16 @@ fn load_tls_acceptor(config: &ServerConfig) -> std::io::Result<Option<TlsAccepto
     }
 
     let mut key_reader = BufReader::new(File::open(key_file)?);
-    let key = rustls_pemfile::private_key(&mut key_reader)?.ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "TLS key file contains no private key",
-        )
-    })?;
+    let key = PrivateKeyDer::pem_reader_iter(&mut key_reader)
+        .next()
+        .transpose()
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "TLS key file contains no private key",
+            )
+        })?;
     let tls_config = tokio_rustls::rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(certs, key)

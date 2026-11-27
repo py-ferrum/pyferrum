@@ -18,7 +18,6 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMO = ROOT / "example-app" / "app.py"
@@ -43,7 +42,7 @@ def wait_for(port: int, timeout: float = 10.0) -> None:
     raise TimeoutError(f"server on :{port} didn't come up in {timeout}s")
 
 
-def get(port: int, path: str, method: str = "GET", body: Optional[bytes] = None, headers=None):
+def get(port: int, path: str, method: str = "GET", body: bytes | None = None, headers=None):
     url = f"http://127.0.0.1:{port}{path}"
     req = urllib.request.Request(url, method=method, data=body, headers=headers or {})
     try:
