@@ -1,0 +1,114 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyferrum"
+version = "1.0.0"
+description = "A Rust-core Python web framework. Hot paths in Rust, business logic in Python."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+    "tomli>=2.0,<3; python_version < '3.11'",
+]
+
+authors = [{ name = "pyferrum contributors" }]
+keywords = [
+    "web",
+    "framework",
+    "asyncio",
+    "rust",
+    "pyo3",
+    "http",
+    "hyper",
+    "tokio",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: System :: Networking",
+    "Typing :: Typed",
+]
+
+[project.scripts]
+pyferrum = "pyferrum.cli:main"
+
+[project.optional-dependencies]
+benchmark = [
+    "aiohttp>=3.9,<4",
+    "fastapi>=0.110,<1",
+    "flask>=3,<4",
+    "gunicorn>=22,<24",
+    "uvicorn>=0.30,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/py-ferrum/pyferrum"
+Repository = "https://github.com/py-ferrum/pyferrum"
+Documentation = "https://github.com/py-ferrum/pyferrum/blob/main/API.md"
+Changelog = "https://github.com/py-ferrum/pyferrum/blob/main/CHANGELOG.md"
+Issues = "https://github.com/py-ferrum/pyferrum/issues"
+Funding = ""
+
+[tool.maturin]
+# The Rust crate that builds the Python extension (workspace member).
+manifest-path = "crates/ferrum-core/Cargo.toml"
+# Pure-Python package files to ship alongside the extension module.
+python-source = "python"
+# Include the pure-Python package + type marker.
+python-packages = ["pyferrum"]
+# `extension-module` avoids linking libpython on Unix.
+features = ["pyo3/extension-module"]
+module-name = "pyferrum._pyferrum"
+# Strip debug symbols from the release binary for smaller wheels.
+strip = true
+# Include the licenses and README in the sdist.
+include = [
+    { path = "LICENSE-MIT", format = "sdist" },
+    { path = "CHANGELOG.md", format = "sdist" },
+    { path = "ARCHITECTURE.md", format = "sdist" },
+    { path = "API.md", format = "sdist" },
+    { path = "ROADMAP.md", format = "sdist" },
+    { path = "CONTRIBUTING.md", format = "sdist" },
+    { path = "SECURITY.md", format = "sdist" },
+    { path = "CODE_OF_CONDUCT.md", format = "sdist" },
+    { path = "example-app/**/*", format = "sdist" },
+    { path = "tests/**/*", format = "sdist" },
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# The native extension does not currently ship a separate stub file.
+[[tool.mypy.overrides]]
+module = ["pyferrum._pyferrum"]
+ignore_missing_imports = true

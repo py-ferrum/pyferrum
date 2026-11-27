@@ -1,0 +1,3 @@
+maturin
+ruff
+aiohttp
