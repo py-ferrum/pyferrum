@@ -22,7 +22,7 @@ jobs:
   # Rust: fmt + clippy + unit tests
   # ----------------------------------------------------------------------
   rust-checks:
-    name: Rust fmt + clippy + test
+    name: rust - cargo fmt + cargo clippy + cargo test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
   # Rust: audit dependencies for known CVEs
   # ----------------------------------------------------------------------
   rust-audit:
-    name: cargo audit
+    name: rust - cargo audit
     runs-on: ubuntu-latest
     # Allow audit failures to be reviewed without blocking PR merges.
     continue-on-error: true
@@ -63,15 +63,15 @@ jobs:
   # Python: build extension, install, run e2e tests
   # ----------------------------------------------------------------------
   python-tests:
-    name: Python e2e (CPython ${{ matrix.python-version }})
+    name: python - e2e (CPython ${{ matrix.python-version }})
     needs: rust-checks
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # abi3-py38 means one wheel works on 3.8 through 3.13+. We test on
-        # the range we claim to support.
-        python-version: ["3.8", "3.10", "3.12", "3.13"]
+        # The abi3 wheel targets CPython 3.8, but the supported range starts at
+        # 3.10; test every supported minor version.
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
 
@@ -113,7 +113,7 @@ jobs:
   # Python: lint
   # ----------------------------------------------------------------------
   python-lint:
-    name: Python ruff + mypy
+    name: python - ruff + example app
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
