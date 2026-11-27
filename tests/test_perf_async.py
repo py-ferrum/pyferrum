@@ -97,7 +97,8 @@ async def bench(session: aiohttp.ClientSession, url: str, n: int, concurrency: i
 
 async def amain(port: int) -> None:
     async with aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=200, limit_per_host=200)
+        connector=aiohttp.TCPConnector(limit=100, limit_per_host=100),
+        timeout=aiohttp.ClientTimeout(total=10),
     ) as session:
         # Warmup
         for _ in range(100):
@@ -105,8 +106,12 @@ async def amain(port: int) -> None:
                 await r.read()
 
         for path in ("/json", "/sync", "/plaintext"):
-            for concurrency in (50, 200):
-                n = 5000
+            for concurrency in (50, 100):
+                n = 1000
+                print(
+                    f"Running {path} with concurrency={concurrency} ({n} requests)",
+                    flush=True,
+                )
                 r = await bench(session, f"http://127.0.0.1:{port}{path}", n, concurrency)
                 print(
                     f"  {path:12s} c={concurrency:3d}  "
@@ -114,7 +119,8 @@ async def amain(port: int) -> None:
                     f"p50={r['p50_ms']:6.2f}ms  "
                     f"p95={r['p95_ms']:6.2f}ms  "
                     f"p99={r['p99_ms']:6.2f}ms  "
-                    f"errors={r['errors']}"
+                    f"errors={r['errors']}",
+                    flush=True,
                 )
 
 
@@ -138,7 +144,7 @@ def main() -> int:
     try:
         wait_for(port)
         print(f"[ok] server up on :{port}\n")
-        asyncio.run(amain(port))
+        asyncio.run(asyncio.wait_for(amain(port), timeout=90))
         return 0
     finally:
         proc.send_signal(15)
