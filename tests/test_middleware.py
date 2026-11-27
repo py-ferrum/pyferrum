@@ -9,7 +9,6 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,7 +51,7 @@ def wait_for(port: int, proc, timeout: float = 10.0) -> None:
 def get(
     port: int,
     path: str,
-    request_id: Optional[str] = None,
+    request_id: str | None = None,
     forwarded: bool = False,
 ):
     headers = {"X-Request-ID": request_id} if request_id else {}

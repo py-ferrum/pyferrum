@@ -10,7 +10,7 @@ should be sent privately as described in [SECURITY.md](SECURITY.md).
 
 ## Development setup
 
-Requirements: stable Rust with Cargo, CPython 3.8+, and a supported platform
+Requirements: stable Rust with Cargo, CPython 3.10+, and a supported platform
 for building the native extension. Use a virtual environment for Python tools
 and packages. Keep Cargo build output inside the environment if you want to
 avoid workspace build artifacts:

@@ -17,19 +17,12 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import AsyncIterable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterable,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
     TypeVar,
-    Union,
 )
 from urllib.parse import quote
 
@@ -70,7 +63,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 def JsonResponse(
     data: Any,
     status_code: int = 200,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     """Build a 200 JSON response from any JSON-serializable Python object.
 
@@ -83,21 +76,21 @@ def JsonResponse(
 def TextResponse(
     text: str,
     status_code: int = 200,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     """Build a 200 `text/plain; charset=utf-8` response."""
     return Response.text(text, status_code=status_code, headers=headers)
 
 
 def HtmlResponse(
-    html: str, status_code: int = 200, headers: Optional[Dict[str, str]] = None
+    html: str, status_code: int = 200, headers: dict[str, str] | None = None
 ) -> Response:
     """Return UTF-8 HTML. The caller is responsible for escaping untrusted content."""
     return Response(html.encode("utf-8"), status_code, "text/html; charset=utf-8", headers)
 
 
 def XmlResponse(
-    xml: str, status_code: int = 200, headers: Optional[Dict[str, str]] = None
+    xml: str, status_code: int = 200, headers: dict[str, str] | None = None
 ) -> Response:
     """Return an already serialized UTF-8 XML document."""
     return Response(xml.encode("utf-8"), status_code, "application/xml; charset=utf-8", headers)
@@ -106,7 +99,7 @@ def XmlResponse(
 def CsvResponse(
     rows: Iterable[Iterable[Any]],
     status_code: int = 200,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     """Serialize rows as UTF-8 CSV using the standard CSV quoting rules."""
     output = io.StringIO(newline="")
@@ -116,18 +109,18 @@ def CsvResponse(
     )
 
 
-def _set_header(headers: Optional[Dict[str, str]], name: str, value: str) -> Dict[str, str]:
+def _set_header(headers: dict[str, str] | None, name: str, value: str) -> dict[str, str]:
     result = {key: item for key, item in (headers or {}).items() if key.lower() != name.lower()}
     result[name] = value
     return result
 
 
 def FileResponse(
-    path: Union[str, Path],
-    filename: Optional[str] = None,
-    content_type: Optional[str] = None,
+    path: str | Path,
+    filename: str | None = None,
+    content_type: str | None = None,
     status_code: int = 200,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     """Read a file into memory and return it as an attachment."""
     file_path = Path(path)
@@ -158,7 +151,7 @@ def FileResponse(
 
 
 def RedirectResponse(
-    location: str, status_code: int = 302, headers: Optional[Dict[str, str]] = None
+    location: str, status_code: int = 302, headers: dict[str, str] | None = None
 ) -> Response:
     """Return a redirect to a caller-supplied location."""
     if status_code not in (301, 302, 303, 307, 308):
@@ -175,9 +168,9 @@ class ServerSentEvent:
     """An SSE event; data may contain multiple lines."""
 
     data: str
-    event: Optional[str] = None
-    id: Optional[str] = None
-    retry: Optional[int] = None
+    event: str | None = None
+    id: str | None = None
+    retry: int | None = None
 
     def encode(self) -> str:
         fields = []
@@ -196,9 +189,9 @@ class ServerSentEvent:
 
 
 def EventSourceResponse(
-    source: AsyncIterable[Union[str, ServerSentEvent]],
+    source: AsyncIterable[str | ServerSentEvent],
     status_code: int = 200,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> StreamingResponse:
     """Stream strings or ServerSentEvent instances using the SSE wire format."""
 
@@ -296,7 +289,7 @@ class Ferrum(_Ferrum):
     def load_routes(
         self,
         route_file: str,
-        python_handlers: Optional[Mapping[str, Callable[..., Any]]] = None,
+        python_handlers: Mapping[str, Callable[..., Any]] | None = None,
     ) -> int:
         """Register routes from a TOML file and return the number loaded.
 
@@ -505,21 +498,21 @@ def run(
     shutdown_timeout_seconds: float = 10.0,
     security_headers_enabled: bool = True,
     cors_enabled: bool = False,
-    cors_allowed_origins: Optional[List[str]] = None,
-    cors_allowed_methods: Optional[List[str]] = None,
-    cors_allowed_headers: Optional[List[str]] = None,
-    cors_exposed_headers: Optional[List[str]] = None,
+    cors_allowed_origins: list[str] | None = None,
+    cors_allowed_methods: list[str] | None = None,
+    cors_allowed_headers: list[str] | None = None,
+    cors_exposed_headers: list[str] | None = None,
     cors_allow_credentials: bool = False,
     cors_max_age: int = 86400,
     rate_limit_requests: int = 0,
     rate_limit_window_seconds: float = 60.0,
     max_rate_limit_clients: int = 10_000,
-    max_header_size: Optional[int] = None,
-    max_header_count: Optional[int] = None,
+    max_header_size: int | None = None,
+    max_header_count: int | None = None,
     max_in_flight_requests: int = 1000,
-    trusted_proxy_hosts: Optional[List[str]] = None,
-    tls_cert_file: Optional[str] = None,
-    tls_key_file: Optional[str] = None,
+    trusted_proxy_hosts: list[str] | None = None,
+    tls_cert_file: str | None = None,
+    tls_key_file: str | None = None,
     tls_handshake_timeout_seconds: float = 10.0,
     request_logging: bool = False,
     compression_enabled: bool = True,

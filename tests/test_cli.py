@@ -143,7 +143,9 @@ class CliTests(unittest.TestCase):
         )
         timestamp = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+Z\s+"
         self.assertRegex(contents, timestamp + r"INFO 200 GET / request_id=test-ok\n")
-        self.assertRegex(contents, timestamp + r"DEBUG 302 GET /redirect request_id=test-redirect\n")
+        self.assertRegex(
+            contents, timestamp + r"DEBUG 302 GET /redirect request_id=test-redirect\n"
+        )
         self.assertRegex(contents, timestamp + r"WARN 404 GET /missing request_id=test-missing\n")
         self.assertRegex(contents, timestamp + r"INFO 200 GET /override request_id=test-original\n")
         self.assertNotIn("secret=hidden", contents)
@@ -230,8 +232,7 @@ class CliTests(unittest.TestCase):
     def test_access_log_levels_obey_rust_log(self):
         port = _port()
         (self.root / "app.py").write_text(
-            _app("filtered")
-            + "\nfrom pyferrum import TextResponse\n"
+            _app("filtered") + "\nfrom pyferrum import TextResponse\n"
             "@app.get('/redirect')\n"
             "def redirect(request):\n"
             "    return TextResponse('redirect', status_code=302)\n"

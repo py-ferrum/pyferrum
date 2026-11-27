@@ -10,7 +10,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 try:
     import tomllib
@@ -23,7 +22,7 @@ _IGNORED_DIRS = {".git", ".venv", "venv", "env", "__pycache__", "target", "node_
 _WATCHED_SUFFIXES = {".py", ".rs", ".toml"}
 
 
-def _project_files(root: Path) -> List[Path]:
+def _project_files(root: Path) -> list[Path]:
     files = []
     for directory, dirs, names in os.walk(str(root)):
         dirs[:] = [name for name in dirs if name not in _IGNORED_DIRS and not name.startswith(".")]
@@ -40,7 +39,7 @@ def _compile_project(root: Path) -> None:
             py_compile.compile(str(path), doraise=True)
 
 
-def _build_native(root: Path) -> Optional[Path]:
+def _build_native(root: Path) -> Path | None:
     config = root / "pyproject.toml"
     if not config.is_file():
         return None
@@ -112,7 +111,7 @@ def _build_native(root: Path) -> Optional[Path]:
     return artifacts[0].resolve()
 
 
-def _snapshot(root: Path) -> Dict[Path, Tuple[int, int]]:
+def _snapshot(root: Path) -> dict[Path, tuple[int, int]]:
     result = {}
     for path in _project_files(root):
         try:
@@ -124,7 +123,7 @@ def _snapshot(root: Path) -> Dict[Path, Tuple[int, int]]:
 
 
 def _serve(
-    entry: str, host: str, port: int, debug: bool, native_library: Optional[Path], dev: bool
+    entry: str, host: str, port: int, debug: bool, native_library: Path | None, dev: bool
 ) -> None:
     module_name, separator, object_name = entry.partition(":")
     if not separator or not module_name or not object_name:
@@ -167,7 +166,7 @@ def _dev(entry: str, host: str, port: int, debug: bool, root: Path) -> int:
     ]
     if debug:
         command.append("--debug")
-    process: Optional[subprocess.Popen] = None
+    process: subprocess.Popen | None = None
     previous_handler = signal.getsignal(signal.SIGTERM)
 
     def terminate(signum: int, frame: object) -> None:
@@ -231,7 +230,7 @@ def _port(value: str) -> int:
     return port
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pyferrum")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("run", "_serve"):
