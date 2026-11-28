@@ -3,9 +3,10 @@
 This single application demonstrates Python sync and async handlers, path and
 query parameters, JSON, text, HTML, XML, CSV, file, redirect, and SSE
 responses, streaming, gzip, metrics, request
-logging, Rust routes loaded from TOML, a static file, a redirect, and an
-optional native plugin. It requires pyferrum installed in your Python
-environment; no additional Python packages are needed.
+logging, a Python route loaded from TOML, a static file, a redirect, and
+optional custom Rust routes defined with `export_routes!`. It requires
+pyferrum installed in your Python environment; no additional Python packages
+are needed.
 
 From the repository root:
 
@@ -34,6 +35,10 @@ includes `Authorization`, so browser requests can send bearer or other
 authorization schemes. CORS controls only browser access; application handlers
 must still implement authentication and authorization.
 
+`/healthz`, `/livez`, and `/readyz` are provided by the optional Rust plugin.
+They return 404 with the standard Python-only invocation until you build the
+custom extension or load the shared library described below.
+
 Try these in another terminal (use HTTPS if TLS is enabled):
 
 ```sh
@@ -61,9 +66,9 @@ curl -i http://127.0.0.1:8080/docs
 curl http://127.0.0.1:8080/metrics
 ```
 
-Other routes include `/sync`, `/slow`, `/text`, `/headers`, `/static`,
-`/livez`, and `/readyz`. The health and readiness responses are static, not
-dependency checks. `/headers` echoes all request headers, including
+Other Python routes include `/sync`, `/slow`, `/text`, `/headers`, and `/static`.
+The plugin's health and readiness responses are static, not dependency checks.
+`/headers` echoes all request headers, including
 credentials: remove or restrict it before exposing this example to others.
 The example has no authentication or authorization and is not production-ready.
 
@@ -93,6 +98,34 @@ status.
 
 ## Optional native plugin
 
+For an extension built into this app's pyferrum install, install pyferrum into
+the Python environment that will run the app, then build in place:
+
+```sh
+cd example-app
+python -m pip install pyferrum
+python -m pyferrum.cli build
+python app.py
+```
+
+`pyferrum build` atomically replaces the pyferrum extension in
+the active Python environment; the Rust routes are registered automatically
+when `app.py` creates its `Ferrum` instance. Rust routes are defined only in
+`native/src/lib.rs` with `export_routes!`; `config.toml` contains the
+`[rust.native]` manifest setting and the Python `[[py.routes]]` entry for
+`/from-table`. The command requires Rust/Cargo and pyferrum installed
+in the active Python environment, but does not require a virtual environment
+or produce a wheel. A venv remains an optional way to isolate that environment.
+The pip-installed Rust plugin SDK is used to compile the route code.
+The SDK package location is resolved dynamically by `pyferrum build` from
+the active Python environment. It does not require a hardcoded
+`site-packages` path or a source-checkout path. The example manifest uses
+Cargo workspace inheritance in the repository and `pyferrum build` replaces
+that dependency with `pyferrum/_pyferrum_sdk` from the installed wheel or
+virtual environment.
+
+The separate shared-library plugin workflow remains available below:
+
 Build the included plugin from the repository root:
 
 ```sh
@@ -100,9 +133,9 @@ cargo build --manifest-path example-app/native/Cargo.toml
 ```
 
 Set `NATIVE_LIBRARY` to the absolute path of the resulting shared library
-(`example-app/native/target/debug/libpyferrum_example_plugin.so` on Linux;
+(`example-app/native/target/debug/libnative_plugin.so` on Linux;
 the filename differs on other platforms), then start the app as above. It
-adds `/plugin/healthz`, `/plugin/livez`, and `/plugin/readyz`. Native plugins
+adds `/healthz`, `/livez`, and `/readyz`. Native plugins
 execute trusted code in-process with the server's privileges; they are not
 sandboxed. See [the architecture guide](../ARCHITECTURE.md) for limitations.
 

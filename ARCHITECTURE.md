@@ -1,6 +1,6 @@
 # pyferrum architecture
 
-This document describes the **implemented 1.0.0 design**. Planned work is
+This document describes the **implemented 1.1.0 design**. Planned work is
 tracked separately in [ROADMAP.md](ROADMAP.md); a proposal is not a feature
 commitment.
 
@@ -44,7 +44,7 @@ crates/ferrum-core/
       lifecycle.rs                 listener, TLS, connections, shutdown
       metrics.rs                   request counters and rate limiter
     native_abi.rs, plugins.rs      native route ABI and trusted plugin loader
-python/pyferrum/                   public Python API and CLI
+python/pyferrum/                   public Python API, CLI, and bundled plugin SDK
 tests/                             Rust/Python behavior and integration tests
 example-app/                       runnable app, including native routes
 ```
@@ -154,16 +154,31 @@ these startup-time Rust routes:
 - `app.static_file(path, file_path, content_type=..., method="GET")` reads the
   file at registration and serves the in-memory bytes.
 - `app.redirect(path, location, status_code=302)` registers a GET redirect.
-- `app.load_routes(...)` can load a TOML `[[routes]]` table. Python handlers
-  must be supplied explicitly; built-in Rust handler names are `health`,
-  `liveness`, and `readiness`.
-- The CLI can build and load an optional native `cdylib` configured by
-  `[tool.pyferrum].rust_manifest`.
+- `app.load_routes(...)` loads TOML routes mapped to explicitly supplied
+  Python handlers. Rust routes cannot be defined in TOML.
+- Custom Rust routes are defined with `export_routes!` in Rust source and
+  included in the installed extension with `pyferrum build`.
+- `config.toml` can hold both Python `[[py.routes]]` and the Rust build setting
+  `[rust.native].manifest`.
+- `pyferrum build` compiles a custom route extension and atomically replaces
+  the Python-facing `_pyferrum` extension in the active Python environment.
+  The extension forwards the Python API to the prebuilt core and contains the
+  compiled route ABI exports; `Ferrum` loads those exports during construction.
+  The SDK dependency is resolved from
+  `pyferrum/_pyferrum_sdk` in the active Python installation, so application
+  manifests do not need to hardcode `site-packages` or repository paths.
+  This command does not require a virtual environment or produce a wheel.
+- `pyferrum verify` checks Python syntax and Rust manifest/source configuration
+  without invoking Cargo. `pyferrum run` never builds or verifies implicitly:
+  it uses the existing custom extension when present, otherwise the core.
+  `pyferrum run --build` builds before starting, while `pyferrum run --core`
+  always selects the original core. In development mode, builds and checks
+  happen on startup and reload only when `--build` and `--verify` are set.
 
-Native plugins use the versioned JSON-byte ABI in `native_abi.rs`. They are
-synchronous, buffered, execute in-process, and are **not sandboxed**. Plugin
-code runs with the server process's privileges. Plugin response buffers are
-limited to 128 MiB; only load code you trust.
+Native routes use the versioned JSON-byte ABI in the bundled Rust plugin SDK.
+They are synchronous, buffered, execute in-process, and are **not sandboxed**.
+Plugin code runs with the server process's privileges. Plugin response buffers
+are limited to 128 MiB; only build/load code you trust.
 
 ## Workers and deployment
 

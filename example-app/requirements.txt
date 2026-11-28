@@ -1,0 +1,3 @@
+asyncio==4.0.0
+pyferrum==1.1.0
+tomli==2.5.0

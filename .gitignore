@@ -58,6 +58,7 @@ coverage.xml
 *.tar.gz
 dist/
 build/
+.pyferrum-build/
 
 # OS
 Thumbs.db

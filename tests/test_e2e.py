@@ -109,10 +109,9 @@ def main() -> int:
         check("GET / -> 200", status == 200, f"(got {status})")
         check("GET / body has hello", b"hello" in body, f"(body={body[:80]!r})")
 
-        # 2. Health
+        # Health routes are provided by the optional native plugin.
         status, body, _ = get(port, "/healthz")
-        check("GET /healthz -> 200", status == 200)
-        check("GET /healthz body", json.loads(body)["status"] == "healthy", f"(body={body!r})")
+        check("GET /healthz without native plugin -> 404", status == 404)
 
         # 3. Path params
         status, body, _ = get(port, "/users/42")
@@ -217,10 +216,10 @@ def main() -> int:
             f"(server={hget(hdrs, 'Server')!r})",
         )
 
-        # 15. Rust-only health routes and request IDs
-        for path, expected in (("/livez", "alive"), ("/readyz", "ready")):
+        # 15. Liveness/readiness routes are also provided by the optional plugin.
+        for path in ("/livez", "/readyz"):
             status, body, _ = get(port, path)
-            check(f"GET {path} -> 200", status == 200 and json.loads(body)["status"] == expected)
+            check(f"GET {path} without native plugin -> 404", status == 404)
 
         status, body, _ = get(port, "/from-table")
         check("TOML Python handler", status == 200 and b"registered from TOML" in body)

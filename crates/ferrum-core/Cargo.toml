@@ -30,3 +30,4 @@ flate2 = { workspace = true }
 libloading = "0.8"
 pyo3 = { workspace = true }
 pyo3-async-runtimes = { workspace = true }
+pyferrum-sdk = { path = "../../python/pyferrum/_pyferrum_sdk" }

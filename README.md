@@ -9,13 +9,13 @@
 application behavior in Python; pyferrum uses Tokio and Hyper for its server,
 router, and selected request/response fast paths.
 
-Version **1.0.0** establishes the first stable public API. pyferrum is not an
+Version **1.1.0** adds build-before-run Rust routing support. pyferrum is not an
 ASGI/WSGI server and is not a drop-in replacement for FastAPI, Flask, or Django.
 See the comparison and current limitations below before choosing it.
 
 ## Install
 
-requires rust and cargo stable versions to build source. install and verify with following commands.
+requires rust and cargo stable versions to build source or to build rust routes. install and verify with following commands.
 ```bash
 sudo apt update && sudo apt install -y build-essential curl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -24,9 +24,8 @@ rustc --version
 cargo --version
 ```
 
-pyferrum supports **CPython 3.10 and newer**. Its abi3 extension targets
-CPython 3.8, while CI tests every supported minor version from 3.10 through
-3.15. PyPy is not a supported runtime.
+pyferrum supports **CPython 3.10 and newer(3.15)**. 
+PyPy is not a supported runtime.
 
 Releases provide prebuilt wheels for Linux and Windows, but not macOS. On
 macOS, `pip` builds the extension from source, so install Rust with Cargo and
@@ -79,11 +78,59 @@ The `pyferrum` CLI can run an importable app and optionally watch project
 Python, Rust, and TOML files:
 
 ```bash
-pyferrum run app:app --dev --debug --host 127.0.0.1 --port 8080
+pyferrum run --dev --build --verify --debug --host 127.0.0.1 --port 8080
 ```
 
-Development mode prints a reload notice when watched files change, before
-revalidating the project and restarting the server.
+By default, `pyferrum run` imports `app:app` from `app.py`. Pass a different
+`module:object` value when your application uses another entry point.
+`run` never builds or verifies automatically: it uses the custom extension if
+one has already been built, otherwise the original core. Use `pyferrum verify`
+to check Python syntax and Rust route configuration without compiling, and
+`pyferrum build` to compile custom routes. `pyferrum run --build` builds and
+then starts the app; `pyferrum run --core` always uses the original core
+extension. `--build` and `--core` cannot be combined. In development mode,
+`--build` and `--verify` opt in to those steps at startup and after changes.
+
+### Build Rust routes into the Python extension
+
+Define Rust handlers and route entries with `export_routes!`, then point
+`rust.native.manifest` in your project's `config.toml` at that Cargo package:
+
+```toml
+[rust.native]
+manifest = "native/Cargo.toml"
+
+[[py.routes]]
+method = "GET"
+path = "/from-table"
+handler = "example"
+```
+
+`[[py.routes]]` entries are for Python handlers; Rust routes remain defined in
+Rust source with `export_routes!`.
+
+With pyferrum installed in the same Python environment that will run the app,
+build the routes into its Python extension:
+
+```bash
+python -m pyferrum.cli build
+pyferrum run
+```
+
+This atomically replaces the installed `_pyferrum` extension in the active
+Python environment; the build does not produce a wheel and does not require a
+virtual environment. Rust routes are registered automatically when the app
+creates a `Ferrum` instance. The build requires Rust/Cargo and pyferrum
+installed in the active Python environment. The SDK used to compile route
+crates is bundled with pyferrum; the full ferrum-core source checkout is not
+needed. It is installed as `_pyferrum_sdk/` inside the active
+`pyferrum` Python package (normally
+`site-packages/pyferrum/_pyferrum_sdk`) and `pyferrum build` resolves that
+absolute path automatically. Application `Cargo.toml` files should use a normal
+`pyferrum-sdk` dependency (or omit it when the CLI injects SDK types);
+the build command dynamically rewrites it to the SDK in the active installation.
+Native route code runs in process with the server's privileges and must be
+trusted. `pyferrum run` uses that extension until rebuilt or run with `--core`.
 
 `--debug` enables detailed server logging by setting `RUST_LOG=debug`; it
 does not return Python tracebacks to clients. Otherwise, `RUST_LOG` controls
@@ -114,8 +161,9 @@ for the supported options.
   in-flight request cap.
 - Optional PEM-based TLS, trusted-proxy forwarding, gzip for eligible buffered
   responses, and a small Prometheus-format `/metrics` endpoint.
-- TOML route tables and Rust-only built-in health, static-file, and redirect
-  routes.
+- TOML route tables for explicitly supplied Python handlers.
+- Rust routes defined with `export_routes!`, plus static-file and redirect
+  helpers.
 - Optional Rust native route plugins. Plugins run synchronously in-process,
   are not sandboxed, and must be trusted.
 - A `pyferrum` command-line runner and optional worker subprocesses on
@@ -147,7 +195,7 @@ claims in this README.
 
 ## Current limitations
 
-The 1.0.0 API baseline does not imply feature parity with larger frameworks.
+The 1.1.0 API release does not imply feature parity with larger frameworks.
 In particular, pyferrum does not currently include:
 
 - ASGI/WSGI hosting or compatibility adapters.

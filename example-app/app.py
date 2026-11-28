@@ -157,7 +157,7 @@ def route_file_handler(request: Request):
     return {"message": "Python handler registered from TOML"}
 
 
-app.load_routes(str(HERE / "routes.toml"), {"example": route_file_handler})
+app.load_routes(str(HERE / "config.toml"), {"example": route_file_handler})
 app.static_file("/static", str(HERE / "index.html"), "text/html; charset=utf-8")
 app.redirect("/docs", "/static")
 

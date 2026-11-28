@@ -1,5 +1,5 @@
 [package]
-name = "pyferrum-example-plugin"
+name = "native-plugin"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-ferrum-core = { path = "../../crates/ferrum-core" }
-
-[workspace]
+pyferrum-sdk = { workspace = true }

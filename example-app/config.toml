@@ -1,0 +1,8 @@
+[rust.native]
+manifest = "native/Cargo.toml"
+
+[[py.routes]]
+method = "GET"
+path = "/from-table"
+handler = "example"
+runtime = "python"

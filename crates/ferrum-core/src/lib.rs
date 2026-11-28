@@ -12,7 +12,7 @@ pub mod server;
 
 pub use handler::{Handler, HandlerFuture, HandlerResult};
 pub use native_abi::{
-    dispatch, free_buffer, route_list, Buffer, Request, Response, Route, RouteInfo,
+    dispatch, export_routes, free_buffer, route_list, Buffer, Request, Response, Route, RouteInfo,
 };
 pub use request::Request as EngineRequest;
 pub use response::Response as EngineResponse;
@@ -23,6 +23,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 #[pymodule]
-fn _pyferrum(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _pyferrum_core(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     python::register(module)
 }
