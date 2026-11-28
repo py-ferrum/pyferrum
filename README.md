@@ -1,4 +1,4 @@
-# pyferrum
+# PyFerrum
 
 [![PyPI version](https://img.shields.io/pypi/v/pyferrum.svg)](https://pypi.org/project/pyferrum/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyferrum.svg)](https://pypi.org/project/pyferrum/)
