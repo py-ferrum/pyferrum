@@ -15,7 +15,7 @@ See the comparison and current limitations below before choosing it.
 
 ## Install
 
-requires rust and cargo stable versions. install and verify with following commands.
+requires rust and cargo stable versions to build source. install and verify with following commands.
 ```bash
 sudo apt update && sudo apt install -y build-essential curl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
