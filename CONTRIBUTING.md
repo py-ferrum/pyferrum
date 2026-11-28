@@ -15,6 +15,15 @@ for building the native extension. Use a virtual environment for Python tools
 and packages. Keep Cargo build output inside the environment if you want to
 avoid workspace build artifacts:
 
+requires rust and cargo stable versions. install and verify with following commands.
+```bash
+sudo apt update && sudo apt install -y build-essential curl
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustc --version
+cargo --version
+```
+
 On macOS, install the Xcode Command Line Tools with `xcode-select --install`
 before building.
 
