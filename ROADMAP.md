@@ -1,11 +1,12 @@
 # pyferrum roadmap
 
-pyferrum 1.0.0 is the first stable public API baseline. The project is
+pyferrum 1.1.0 extends the first stable public API with build-before-run Rust
+route integration. The project is
 intentionally narrower than full Python web frameworks. This roadmap tracks
 unimplemented work; it does not imply a release date or guarantee that every
 item will be built. Priorities may change with user feedback.
 
-## 1.0.0 baseline
+## 1.1.0 routing baseline
 
 Implemented and described in [ARCHITECTURE.md](ARCHITECTURE.md):
 

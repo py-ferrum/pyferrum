@@ -32,7 +32,7 @@ pub struct PyApp {
 #[pymethods]
 impl PyApp {
     #[new]
-    #[pyo3(signature = (server_name="pyferrum/1.0".to_string(), max_python_in_flight=100))]
+    #[pyo3(signature = (server_name="pyferrum/1.1".to_string(), max_python_in_flight=100))]
     fn new(py: Python<'_>, server_name: String, max_python_in_flight: usize) -> PyResult<Self> {
         if max_python_in_flight == 0 {
             return Err(PyValueError::new_err(
@@ -71,30 +71,6 @@ impl PyApp {
             .add(m, path, py_handler)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(handler)
-    }
-
-    fn _register_builtin(&mut self, method: &str, path: &str, handler: &str) -> PyResult<()> {
-        let method = Method::from_bytes(method.as_bytes())
-            .map_err(|e| PyValueError::new_err(format!("bad method {method:?}: {e}")))?;
-        let status = match handler {
-            "health" => "healthy",
-            "liveness" => "alive",
-            "readiness" => "ready",
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "unknown Rust builtin handler {handler:?}"
-                )))
-            }
-        };
-        let native_handler: Arc<dyn Handler> = Arc::new(move |_req: EngineRequest| {
-            let response = EngineResponse::json(Bytes::from(
-                format!("{{\"status\":\"{status}\"}}").into_bytes(),
-            ));
-            Box::pin(async move { Ok(response) }) as HandlerFuture
-        });
-        self.router
-            .add(method, path, native_handler)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn _load_native_routes(&mut self, library_path: &str) -> PyResult<()> {

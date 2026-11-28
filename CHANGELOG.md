@@ -4,16 +4,47 @@ Notable changes are recorded here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
-## [Unreleased]
+## [1.1.0] - 2026-11-28
 
 ### Added
 
-- Configurable CORS origin, method, request-header, credential, exposed-header,
-  and preflight max-age controls. `Authorization` is allowed by the default
-  CORS request-header policy and remains available to Python handlers through
-  `Request.headers`.
-- Python response helpers for HTML, XML, CSV, file downloads, redirects, and
-  server-sent events over the existing streaming response support.
+- Rust routes can be declared with `export_routes!` and compiled into the
+  active pyferrum Python extension with `pyferrum build`.
+- `pyferrum verify` checks Python syntax and Rust route manifest/source
+  configuration without invoking Cargo.
+- `pyferrum run --build` now provides an explicit build-before-run workflow.
+  Development reloads build and verify only when `--build` and `--verify` are
+  enabled.
+- `pyferrum run --core` explicitly bypasses an installed custom route
+  extension and uses the original core extension.
+- Bundled Rust SDK support for route crates, including the stable JSON-byte
+  native route ABI used by the packaged build workflow.
+
+### Changed
+
+- Rust route configuration moved to `[rust.native].manifest` in `config.toml`;
+  Rust routes are no longer selected as built-in names in TOML route tables.
+- `[[py.routes]]` is now the documented Python route table; legacy
+  top-level `[[routes]]` remains accepted for compatibility.
+- `pyferrum run` no longer builds or verifies implicitly. It uses an existing
+  custom extension when present and otherwise uses the original core extension.
+- Updated the default HTTP `Server` header and package/Rust workspace release
+  metadata to identify pyferrum 1.1.
+- Improved documentation for build, verify, core/custom extension selection,
+  development reload behavior, and trusted native-route execution.
+
+### Packaging
+
+- Python package, Rust workspace, core crate, and bundled SDK version set to
+  `1.1.0`.
+- The SDK and example native route source are included in source distributions;
+  route builds can use the bundled SDK without a ferrum-core checkout.
+
+### Security
+
+- Native route code continues to execute synchronously in-process with the
+  server process privileges and is explicitly documented as trusted code, not
+  a sandbox.
 
 ## [1.0.0] - 2026-11-27
 

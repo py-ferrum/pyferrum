@@ -1,6 +1,6 @@
 # pyferrum API reference
 
-This document describes the public Python API in pyferrum 1.0.0. It covers
+This document describes the public Python API in pyferrum 1.1.0. It covers
 application setup, route registration, requests and responses, server options,
 and the command-line runner. For architecture and execution order, see
 [ARCHITECTURE.md](ARCHITECTURE.md). For a runnable app, see
@@ -14,7 +14,7 @@ and the command-line runner. For architecture and execution order, see
 from pyferrum import Ferrum
 
 app = Ferrum(
-    server_name: str = "pyferrum/1.0",
+    server_name: str = "pyferrum/1.1",
     max_python_in_flight: int = 100,
 )
 ```
@@ -57,38 +57,32 @@ application's remaining route table.
 
 ### `load_routes(route_file, python_handlers=None)`
 
-Loads a TOML file containing a `[[routes]]` array and returns its entry count.
-Each table requires string `method`, `path`, and `handler` values. `runtime`
-defaults to `"python"`.
+Loads a TOML file containing a `[[py.routes]]` array and returns its entry
+count. Each table requires string `method`, `path`, and `handler` values.
+`runtime` defaults to `"python"`; `"rust"` is not supported. Legacy files
+with top-level `[[routes]]` are also accepted.
 
 ```toml
-[[routes]]
-method = "GET"
-path = "/healthz"
-handler = "health"
-runtime = "rust"
-
-[[routes]]
+[[py.routes]]
 method = "GET"
 path = "/hello"
 handler = "hello"
-runtime = "python"
 ```
 
 ```python
 app.load_routes(
-    "routes.toml",
+    "config.toml",
     python_handlers={"hello": hello_handler},
 )
 ```
 
 Python handlers must be explicitly supplied in `python_handlers`; TOML does
-not import or execute arbitrary Python names. Supported Rust handler names
-are `health`, `liveness`, and `readiness`. They return fixed responses and do
-not check application dependencies. Invalid TOML, missing files, unsupported
-runtimes, unknown handlers, or invalid routes raise `ValueError`. If loading
-fails partway through, routes registered earlier in that call are not rolled
-back.
+not import or execute arbitrary Python names. Rust routes must be implemented
+in Rust with `export_routes!` and compiled into the installed extension with
+`pyferrum build`. TOML entries that specify `runtime = "rust"` raise
+`ValueError`. Invalid TOML, missing files, unsupported runtimes, unknown
+handlers, or invalid routes also raise `ValueError`. If loading fails partway
+through, routes registered earlier in that call are not rolled back.
 
 ### `static_file(path, file_path, content_type="application/octet-stream", method="GET")`
 
@@ -342,22 +336,35 @@ an appropriate token-validation strategy and secret management.
 
 ## Command line
 
-Run an importable application using `module:object` notation:
+Run the default application (`app:app` from `app.py`):
 
 ```sh
-pyferrum run app:app --host 127.0.0.1 --port 8080
+pyferrum run --host 127.0.0.1 --port 8080
 ```
+
+For a different entry point, pass `module:object`, for example
+`pyferrum run server:web`.
 
 Useful options:
 
 - `--dev` watches Python, Rust, and TOML project files and reloads after
-  changes.
+  changes. Building and verification remain opt-in with `--build` and
+  `--verify`.
+- `--build` builds the configured Rust routes before starting the server.
+- `--core` bypasses routes integrated into the custom extension and uses the
+  original core extension.
+- `--verify` checks project Python syntax and Rust route configuration before
+  starting; it does not run Cargo.
 - `--debug` enables debug-level server logs and access logging.
 - `--host` and `--port` select the bind address.
 
-The CLI validates Python sources and configured Rust routes before starting.
-See `pyferrum run --help` for the installed version's options. Debug logging
-does not expose handler tracebacks in HTTP responses.
+`pyferrum run` does not build or verify automatically. It uses an already-built
+custom extension when present, otherwise the original core. Use
+`pyferrum verify` to check without compiling, `pyferrum build` to compile
+without starting the server, or `pyferrum run --build` to build and then run.
+`--build` and `--core` are mutually exclusive. See `pyferrum run --help` for
+the installed version's options. Debug logging does not expose handler
+tracebacks in HTTP responses.
 
 ## Runtime limits and security notes
 

@@ -1,5 +1,7 @@
 """Integration tests for the command-line application runner."""
 
+import importlib.machinery
+import json
 import os
 import re
 import shutil
@@ -44,6 +46,8 @@ class CliTests(unittest.TestCase):
         )
         self.env.pop("RUST_LOG", None)
         self.process = None
+        self.native_extension_path = None
+        self.native_extension_backup = None
 
     def tearDown(self):
         if self.process is not None and self.process.poll() is None:
@@ -53,7 +57,18 @@ class CliTests(unittest.TestCase):
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait()
+        self._restore_native_extension()
         self.temp.cleanup()
+
+    def _restore_native_extension(self):
+        if self.native_extension_path is None:
+            return
+        if self.native_extension_backup is None:
+            self.native_extension_path.unlink(missing_ok=True)
+        else:
+            self.native_extension_path.write_bytes(self.native_extension_backup)
+        self.native_extension_path = None
+        self.native_extension_backup = None
 
     def command(self, *args):
         return [sys.executable, "-m", "pyferrum.cli", *args]
@@ -75,11 +90,11 @@ class CliTests(unittest.TestCase):
             time.sleep(0.1)
         self.fail(f"expected {expected!r}; last response/error: {last_error}")
 
-    def test_run_compiles_and_serves_with_debug(self):
+    def test_run_defaults_to_app_and_serves_with_debug(self):
         (self.root / "app.py").write_text(_app("first"))
         port = _port()
         self.process = subprocess.Popen(
-            self.command("run", "app:app", "--port", str(port), "--debug"),
+            self.command("run", "--port", str(port), "--debug"),
             cwd=self.root,
             env=self.env,
             stdout=subprocess.DEVNULL,
@@ -90,6 +105,67 @@ class CliTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz")
         self.assertEqual(error.exception.code, 404)
+
+    def test_run_does_not_build_or_verify_by_default(self):
+        (self.root / "app.py").write_text(_app("no-build"))
+        (self.root / "config.toml").write_text(
+            '[rust.native]\nmanifest = "missing/Cargo.toml"\n'
+        )
+        port = _port()
+        log = self.root / "server.log"
+        with log.open("w") as output:
+            self.process = subprocess.Popen(
+                self.command("run", "--port", str(port)),
+                cwd=self.root,
+                env=self.env,
+                stdout=output,
+                stderr=output,
+            )
+        self.response(port, "no-build:")
+        self.assertNotIn("Verifying", log.read_text())
+        self.assertNotIn("Compiling", log.read_text())
+
+    def test_run_core_flag(self):
+        (self.root / "app.py").write_text(_app("core"))
+        port = _port()
+        self.process = subprocess.Popen(
+            self.command("run", "--core", "--port", str(port)),
+            cwd=self.root,
+            env=self.env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        self.response(port, "core:")
+
+    def test_ctrl_c_prints_simple_shutdown_message(self):
+        (self.root / "app.py").write_text(_app("stopping"))
+        port = _port()
+        log = self.root / "server.log"
+        with log.open("w") as output:
+            self.process = subprocess.Popen(
+                self.command("run", "--port", str(port)),
+                cwd=self.root,
+                env=self.env,
+                stdout=output,
+                stderr=output,
+            )
+        self.response(port, "stopping:")
+        self.process.send_signal(signal.SIGINT)
+        self.process.wait(timeout=15)
+        contents = log.read_text()
+        self.assertIn("\n[!] Server Stopped...!\n", contents)
+        self.assertNotIn("Traceback", contents)
+        self.assertNotIn("KeyboardInterrupt", contents)
+
+    def test_run_build_and_core_are_mutually_exclusive(self):
+        result = subprocess.run(
+            self.command("run", "--build", "--core"),
+            cwd=self.root,
+            env=self.env,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(b"not allowed with argument", result.stderr)
 
     def test_human_readable_startup_and_request_logs(self):
         (self.root / "app.py").write_text(
@@ -133,7 +209,7 @@ class CliTests(unittest.TestCase):
         self.process.send_signal(signal.SIGTERM)
         self.process.wait(timeout=15)
         contents = log.read_text()
-        self.assertIn("Verifying Python sources and configured Rust routes...", contents)
+        self.assertNotIn("Verifying Python sources", contents)
         self.assertIn(
             "Registered routes: 3\nApp: app:app\nDev mode: disabled\nDebug mode: enabled", contents
         )
@@ -273,7 +349,9 @@ class CliTests(unittest.TestCase):
         log = self.root / "server.log"
         with log.open("w") as output:
             self.process = subprocess.Popen(
-                self.command("run", "app:app", "--port", str(port), "--dev", "--debug"),
+                self.command(
+                    "run", "app:app", "--port", str(port), "--dev", "--verify", "--debug"
+                ),
                 cwd=self.root,
                 env=self.env,
                 stdout=output,
@@ -289,13 +367,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(contents.count("PyFerrum"), 1)
         self.assertEqual(contents.count("Detected changes - reloading server"), 2)
         self.assertEqual(
-            contents.count("Verifying Python sources and configured Rust routes..."), 3
+            contents.count("Verifying Python sources and Rust route configuration..."), 3
         )
         self.assertEqual(contents.count("Server initialized"), 3)
         reload_block = (
             "\n" + "=" * 60 + "\n"
             "Detected changes - reloading server\n\n"
-            "Verifying Python sources and configured Rust routes...\n"
+            "Verifying Python sources and Rust route configuration...\n"
             "Registered routes: 1\n"
             "App: app:app\n"
             "Dev mode: enabled\n"
@@ -327,7 +405,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(contents.count("PyFerrum"), 1)
         self.assertIn("=" * 60 + "\nDetected changes - reloading server\n", contents)
 
-    def test_explicit_health_example(self):
+    def test_example_does_not_load_optional_health_routes_by_default(self):
         shutil.copytree(
             ROOT / "example-app",
             self.root,
@@ -347,18 +425,17 @@ class CliTests(unittest.TestCase):
             if self.process.poll() is not None:
                 self.fail(f"server exited with {self.process.returncode}")
             try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/healthz", timeout=1
-                ) as response:
-                    self.assertIn(b'"healthy"', response.read())
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
+                    self.assertEqual(response.status, 200)
                     break
             except urllib.error.URLError:
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
-        for path, status in (("/livez", b'"alive"'), ("/readyz", b'"ready"')):
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=1) as response:
-                self.assertIn(status, response.read())
+        for path in ("/healthz", "/livez", "/readyz"):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=1)
+            self.assertEqual(error.exception.code, 404)
 
     def test_example_environment_controls_runtime(self):
         port = _port()
@@ -412,10 +489,115 @@ class CliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("REQUEST_LOGGING must be true, false, 1, or 0", result.stderr)
 
+    def test_build_has_no_output_mode_options(self):
+        result = subprocess.run(
+            self.command("build", "--help"),
+            cwd=self.root,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("--wheel", result.stdout)
+        self.assertNotIn("--no-wheel", result.stdout)
+
+    def test_cargo_build_output_is_streamed_before_completion(self):
+        script = (
+            "from pyferrum.cli import _stream_cargo_build\n"
+            "import sys\n"
+            "command = [sys.executable, '-c', "
+            "\"print('Compiling live-output', flush=True); "
+            "import time; time.sleep(1)\"]\n"
+            "returncode, _ = _stream_cargo_build(command, '.', dict(__import__('os').environ))\n"
+            "raise SystemExit(returncode)\n"
+        )
+        process = subprocess.Popen(
+            [sys.executable, "-c", script],
+            cwd=self.root,
+            env=self.env,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        try:
+            assert process.stderr is not None
+            line = process.stderr.readline()
+            self.assertIn("Compiling live-output", line)
+            self.assertIsNone(process.poll(), "cargo output was buffered until process exit")
+            process.wait(timeout=5)
+            self.assertEqual(process.returncode, 0)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
+
+    def test_help_documents_config_schema(self):
+        for arguments, expected in (
+            (("--help",), ("config.toml", "[rust.native].manifest", "[[py.routes]]")),
+            (("run", "--help"), ("--build", "config.toml", "--verify")),
+            (("build", "--help"), ("config.toml", "[rust.native].manifest")),
+            (("verify", "--help"), ("config.toml", "does not compile Rust")),
+        ):
+            result = subprocess.run(
+                self.command(*arguments),
+                cwd=self.root,
+                env=self.env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for text in expected:
+                self.assertIn(text, result.stdout)
+
+    def test_build_uses_active_python_without_project_venv(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import json, sys; "
+                "from pyferrum.cli import _python_context; "
+                "python, info = _python_context(); "
+                "print(json.dumps({'python': str(python), 'package': info['package']}))",
+            ],
+            cwd=self.root,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        context = json.loads(result.stdout)
+        self.assertEqual(Path(context["python"]), Path(sys.executable).resolve())
+        self.assertTrue((Path(context["package"]) / "_pyferrum_sdk" / "Cargo.toml").is_file())
+        self.assertFalse((self.root / ".venv").exists())
+
+    def test_core_selector_uses_original_extension(self):
+        script = (
+            "import importlib, types; "
+            "from pyferrum import cli; "
+            "package = importlib.import_module('pyferrum'); "
+            "custom = types.SimpleNamespace(__file__='custom.so', "
+            "__pyferrum_native_routes__=True); "
+            "cli._native_extension = custom; "
+            "setattr(package, '_native_extension', custom); "
+            "cli._select_core_extension(); "
+            "selected = cli._native_extension; "
+            "assert Path(selected.__file__).name.startswith('_pyferrum_core.'); "
+            "assert not getattr(selected, '__pyferrum_native_routes__', False); "
+            "assert getattr(package, '_native_extension') is selected"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", "from pathlib import Path; " + script],
+            cwd=self.root,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_invalid_source_and_native_configuration_fail_explicitly(self):
         (self.root / "app.py").write_text("def broken(:\n")
         result = subprocess.run(
-            self.command("run", "app:app"),
+            self.command("verify"),
             cwd=self.root,
             env=self.env,
             capture_output=True,
@@ -423,17 +605,41 @@ class CliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(b"SyntaxError", result.stderr)
         (self.root / "app.py").write_text(_app("ok"))
-        (self.root / "pyproject.toml").write_text(
-            '[tool.pyferrum]\nrust_manifest = "native/Cargo.toml"\n'
+        (self.root / "config.toml").write_text(
+            '[rust.native]\nmanifest = "native/Cargo.toml"\n'
+            '\n[[py.routes]]\nmethod = "GET"\npath = "/from-table"\nhandler = "example"\n'
         )
         result = subprocess.run(
-            self.command("run", "app:app"),
+            self.command("verify"),
             cwd=self.root,
             env=self.env,
             capture_output=True,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn(b"Cargo.toml", result.stderr)
+        self.assertIn(b"Rust route manifest does not exist", result.stderr)
+
+    def test_verify_checks_rust_configuration_without_compiling(self):
+        (self.root / "app.py").write_text(_app("verified"))
+        (self.root / "config.toml").write_text(
+            '[rust.native]\nmanifest = "native/Cargo.toml"\n'
+            '\n[[py.routes]]\nmethod = "GET"\npath = "/from-table"\nhandler = "example"\n'
+        )
+        native = self.root / "native"
+        (native / "src").mkdir(parents=True)
+        (native / "Cargo.toml").write_text(
+            '[package]\nname = "verify-only"\nversion = "0.1.0"\nedition = "2021"\n'
+            '\n[lib]\ncrate-type = ["cdylib"]\n'
+        )
+        (native / "src" / "lib.rs").write_text("this is not valid Rust syntax")
+        result = subprocess.run(
+            self.command("verify"),
+            cwd=self.root,
+            env=self.env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((native / "target").exists())
 
     def test_native_health_example_rebuilds_and_runs_with_python(self):
         shutil.copytree(
@@ -442,13 +648,17 @@ class CliTests(unittest.TestCase):
             ignore=shutil.ignore_patterns("target"),
         )
         (self.root / "app.py").write_text(_app("Hello from Python"))
-        (self.root / "pyproject.toml").write_text(
-            '[tool.pyferrum]\nrust_manifest = "native/Cargo.toml"\n'
+        (self.root / "config.toml").write_text(
+            '[rust.native]\nmanifest = "native/Cargo.toml"\n'
         )
         manifest = self.root / "native" / "Cargo.toml"
         manifest.write_text(
             manifest.read_text().replace(
                 "../../crates/ferrum-core", (ROOT / "crates" / "ferrum-core").as_posix()
+            )
+            .replace(
+                "../../python/pyferrum/_pyferrum_sdk",
+                (ROOT / "python" / "pyferrum" / "_pyferrum_sdk").as_posix(),
             )
         )
         rust_source = self.root / "native" / "src" / "lib.rs"
@@ -464,19 +674,28 @@ class CliTests(unittest.TestCase):
                 "}\n\nexport_routes!(",
             )
             .replace(
-                '    ("GET", "/plugin/healthz", health),',
+                '    ("GET", "/healthz", health),',
                 '    ("GET", "/native/{name}", name),\n'
                 '    ("GET", "/native-failure", failing),\n'
-                '    ("GET", "/plugin/healthz", health),',
+                '    ("GET", "/healthz", health),',
             )
         )
         port = _port()
         log = self.root / "server.log"
+        abi3_suffix = next(
+            suffix
+            for suffix in importlib.machinery.EXTENSION_SUFFIXES
+            if suffix.startswith(".abi3.")
+        )
+        extension_path = ROOT / "python" / "pyferrum" / f"_pyferrum{abi3_suffix}"
+        self.native_extension_path = extension_path
+        if extension_path.is_file():
+            self.native_extension_backup = extension_path.read_bytes()
         runner = Path(sys.executable).with_name("pyferrum.exe" if os.name == "nt" else "pyferrum")
         cli = [str(runner), "run"] if runner.is_file() else self.command("run")
         with log.open("w") as output:
             self.process = subprocess.Popen(
-                [*cli, "app:app", "--port", str(port), "--dev", "--debug"],
+                [*cli, "app:app", "--port", str(port), "--dev", "--build", "--verify", "--debug"],
                 cwd=self.root,
                 env=self.env,
                 stdout=output,
@@ -500,40 +719,74 @@ class CliTests(unittest.TestCase):
             self.fail(f"no expected response for {path}: {log.read_text()}")
 
         wait_for("/", b"Hello from Python")
-        wait_for("/plugin/healthz", b'"healthy"')
-        wait_for("/plugin/livez", b'"alive"')
-        wait_for("/plugin/readyz", b'"ready"')
+        wait_for("/healthz", b'"healthy"')
+        wait_for("/livez", b'"alive"')
+        wait_for("/readyz", b'"ready"')
         wait_for("/native/alice", b"alice")
         with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(
-                urllib.request.Request(f"http://127.0.0.1:{port}/plugin/healthz", method="POST")
+                urllib.request.Request(f"http://127.0.0.1:{port}/healthz", method="POST")
             )
         self.assertEqual(error.exception.code, 405)
         with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/native-failure")
         self.assertEqual(error.exception.code, 500)
-        wait_for("/plugin/healthz", b'"healthy"')
+        wait_for("/healthz", b'"healthy"')
         rust_source.write_text(rust_source.read_text().replace('"healthy"', '"reloaded"'))
-        wait_for("/plugin/healthz", b'"reloaded"')
+        wait_for("/healthz", b'"reloaded"')
         valid_source = rust_source.read_text()
         rust_source.write_text(valid_source + "\ninvalid rust code\n")
         deadline = time.monotonic() + 120
-        while "native Cargo build failed" not in log.read_text():
+        while "custom Rust route build failed" not in log.read_text():
             if time.monotonic() >= deadline:
                 self.fail(f"invalid Rust build was not reported: {log.read_text()}")
             time.sleep(0.1)
         rust_source.write_text(valid_source)
-        wait_for("/plugin/healthz", b'"reloaded"')
+        wait_for("/healthz", b'"reloaded"')
         self.process.send_signal(signal.SIGTERM)
         self.process.wait(timeout=15)
+        extension_path.unlink(missing_ok=True)
+        build_port = _port()
+        with log.open("a") as output:
+            self.process = subprocess.Popen(
+                [
+                    *cli,
+                    "app:app",
+                    "--port",
+                    str(build_port),
+                    "--build",
+                    "--verify",
+                ],
+                cwd=self.root,
+                env=self.env,
+                stdout=output,
+                stderr=output,
+            )
+        port = build_port
+        wait_for("/healthz", b'"reloaded"')
+        wait_for("/native/alice", b"alice")
+        self.process.send_signal(signal.SIGTERM)
+        self.process.wait(timeout=15)
+        extension_path.unlink(missing_ok=True)
         if os.name == "nt":
-            library_name = "pyferrum_example_plugin.dll"
+            library_name = "native_plugin.dll"
         elif sys.platform == "darwin":
-            library_name = "libpyferrum_example_plugin.dylib"
+            library_name = "libnative_plugin.dylib"
         else:
-            library_name = "libpyferrum_example_plugin.so"
-        target = Path(self.env.get("CARGO_TARGET_DIR", self.root / "native" / "target"))
+            library_name = "libnative_plugin.so"
+        target = Path(
+            self.env.get("CARGO_TARGET_DIR", self.root / "native" / "target")
+        ).resolve()
         library = (target / "debug" / library_name).resolve()
+        build_env = {**self.env, "CARGO_TARGET_DIR": str(target)}
+        build = subprocess.run(
+            ["cargo", "build", "--manifest-path", str(self.root / "native" / "Cargo.toml")],
+            cwd=self.root,
+            env=build_env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(build.returncode, 0, build.stderr)
         example_port = _port()
         env = {
             **self.env,
@@ -550,8 +803,8 @@ class CliTests(unittest.TestCase):
                 stderr=output,
             )
         port = example_port
-        wait_for("/plugin/healthz", b'"reloaded"')
-        wait_for("/healthz", b'"healthy"')
+        wait_for("/healthz", b'"reloaded"')
+        wait_for("/from-table", b"Python handler registered from TOML")
 
 
 if __name__ == "__main__":

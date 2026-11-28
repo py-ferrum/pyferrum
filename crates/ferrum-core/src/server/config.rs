@@ -72,7 +72,7 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
             max_body_size: 10 * 1024 * 1024,
-            server_name: "pyferrum/1.0".to_string(),
+            server_name: "pyferrum/1.1".to_string(),
             request_logging: false,
             compression_enabled: true,
             compression_threshold: 1024,

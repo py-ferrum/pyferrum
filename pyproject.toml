@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pyferrum"
-version = "1.0.0"
+version = "1.1.0"
 description = "A Rust-core Python web framework. Hot paths in Rust, business logic in Python."
 readme = "README.md"
 license = { text = "MIT" }
@@ -76,7 +76,7 @@ python-source = "python"
 python-packages = ["pyferrum"]
 # `extension-module` avoids linking libpython on Unix.
 features = ["pyo3/extension-module"]
-module-name = "pyferrum._pyferrum"
+module-name = "pyferrum._pyferrum_core"
 # Strip debug symbols from the release binary for smaller wheels.
 strip = true
 # Include the licenses and README in the sdist.
@@ -90,6 +90,8 @@ include = [
     { path = "SECURITY.md", format = "sdist" },
     { path = "CODE_OF_CONDUCT.md", format = "sdist" },
     { path = "example-app/**/*", format = "sdist" },
+    { path = "python/pyferrum/_pyferrum_sdk/**/*", format = "wheel" },
+    { path = "python/pyferrum/_pyferrum_sdk/**/*", format = "sdist" },
     { path = "tests/**/*", format = "sdist" },
 ]
 

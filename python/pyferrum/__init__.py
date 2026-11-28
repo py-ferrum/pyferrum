@@ -31,6 +31,7 @@ try:
 except ImportError:
     import tomli as tomllib
 
+from . import _pyferrum as _native_extension
 from ._pyferrum import (
     Request,
     Response,
@@ -256,7 +257,7 @@ class Ferrum(_Ferrum):
 
     Args:
         server_name: Value of the HTTP Server header. An empty string disables it.
-            Defaults to ``"pyferrum/1.0"``.
+            Defaults to ``"pyferrum/1.1"``.
         max_python_in_flight: Maximum concurrent Python handler invocations
             per application instance. Must be positive; excess requests receive
             HTTP 503. Defaults to 100.
@@ -286,6 +287,13 @@ class Ferrum(_Ferrum):
         ```
     """
 
+    def __init__(
+        self, server_name: str = "pyferrum/1.1", max_python_in_flight: int = 100
+    ) -> None:
+        del server_name, max_python_in_flight
+        if getattr(_native_extension, "__pyferrum_native_routes__", False):
+            self._load_native_routes(str(_native_extension.__file__))
+
     def load_routes(
         self,
         route_file: str,
@@ -293,12 +301,12 @@ class Ferrum(_Ferrum):
     ) -> int:
         """Register routes from a TOML file and return the number loaded.
 
-        ``route_file`` must contain a ``[[routes]]`` array whose entries have
-        string ``method``, ``path`` and ``handler`` fields. ``runtime``
+        ``route_file`` should contain a ``[[py.routes]]`` array whose entries
+        have string ``method``, ``path`` and ``handler`` fields. ``runtime``
         defaults to ``"python"``. Python handler names must be supplied in
-        ``python_handlers``; Rust handler names are ``health``, ``liveness``
-        and ``readiness``. These built-ins return fixed status values, not
-        dependency checks.
+        ``python_handlers``. Legacy top-level ``[[routes]]`` files are also
+        accepted. Rust routes cannot be defined in TOML; define them in Rust
+        with the ``export_routes!`` macro.
 
         Raises:
             ValueError: The file cannot be read, is invalid TOML, or contains
@@ -310,9 +318,14 @@ class Ferrum(_Ferrum):
         except (OSError, tomllib.TOMLDecodeError) as error:
             raise ValueError(f"invalid route file {route_file!r}: {error}") from error
 
-        routes = document.get("routes")
+        py_config = document.get("py", {})
+        if not isinstance(py_config, dict):
+            raise ValueError("[py] in route file must be a table")
+        routes = py_config.get("routes")
+        if routes is None:
+            routes = document.get("routes")
         if not isinstance(routes, list):
-            raise ValueError("route file must contain a [[routes]] array")
+            raise ValueError("route file must contain a [[py.routes]] array")
 
         for index, route in enumerate(routes):
             if not isinstance(route, dict):
@@ -325,17 +338,18 @@ class Ferrum(_Ferrum):
                 raise ValueError(
                     f"route {index} requires string method, path, handler, and runtime"
                 )
-            if runtime == "python":
-                callable_ = (python_handlers or {}).get(handler)
-                if callable_ is None:
-                    raise ValueError(
-                        f"route {index} handler {handler!r} was not explicitly supplied"
-                    )
-                self._register(method.upper(), path, callable_)
-            elif runtime == "rust":
-                self._register_builtin(method.upper(), path, handler)
-            else:
+            if runtime == "rust":
+                raise ValueError(
+                    f"route {index}: Rust routes must be defined with export_routes!, not TOML"
+                )
+            if runtime != "python":
                 raise ValueError(f"route {index} has unsupported runtime {runtime!r}")
+            callable_ = (python_handlers or {}).get(handler)
+            if callable_ is None:
+                raise ValueError(
+                    f"route {index} handler {handler!r} was not explicitly supplied"
+                )
+            self._register(method.upper(), path, callable_)
         return len(routes)
 
     def static_file(
@@ -426,7 +440,21 @@ class Ferrum(_Ferrum):
                 flush=True,
             )
             kwargs.setdefault("reuse_port", workers > 1)
-            super().run(*args, **kwargs)
+            interrupted = False
+
+            def handle_sigint(signum: int, frame: Any) -> None:
+                nonlocal interrupted
+                interrupted = True
+
+            previous_sigint = signal.signal(signal.SIGINT, handle_sigint)
+            try:
+                super().run(*args, **kwargs)
+            except KeyboardInterrupt:
+                print("\n[!] Server Stopped...!\n", flush=True)
+            finally:
+                signal.signal(signal.SIGINT, previous_sigint)
+            if interrupted:
+                print("\n[!] Server Stopped...!\n", flush=True)
             return
         _run_workers(workers, restart_limit)
 
