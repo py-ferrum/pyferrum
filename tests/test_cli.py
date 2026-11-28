@@ -660,6 +660,12 @@ class CliTests(unittest.TestCase):
                 "../../python/pyferrum/_pyferrum_sdk",
                 (ROOT / "python" / "pyferrum" / "_pyferrum_sdk").as_posix(),
             )
+            .replace(
+                "pyferrum-sdk = { workspace = true }",
+                "pyferrum-sdk = { path = "
+                f'"{(ROOT / "python" / "pyferrum" / "_pyferrum_sdk").as_posix()}"'
+                " }",
+            )
         )
         rust_source = self.root / "native" / "src" / "lib.rs"
         rust_source.write_text(

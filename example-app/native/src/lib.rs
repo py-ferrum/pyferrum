@@ -1,4 +1,4 @@
-use ferrum_core::{export_routes, Request, Response};
+use pyferrum_sdk::{export_routes, Request, Response};
 
 fn health(_request: &Request) -> Response {
     Response::json(r#"{"status":"healthy"}"#)

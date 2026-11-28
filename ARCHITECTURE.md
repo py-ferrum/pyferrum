@@ -164,6 +164,9 @@ these startup-time Rust routes:
   the Python-facing `_pyferrum` extension in the active Python environment.
   The extension forwards the Python API to the prebuilt core and contains the
   compiled route ABI exports; `Ferrum` loads those exports during construction.
+  The SDK dependency is resolved from
+  `pyferrum/_pyferrum_sdk` in the active Python installation, so application
+  manifests do not need to hardcode `site-packages` or repository paths.
   This command does not require a virtual environment or produce a wheel.
 - `pyferrum verify` checks Python syntax and Rust manifest/source configuration
   without invoking Cargo. `pyferrum run` never builds or verifies implicitly:

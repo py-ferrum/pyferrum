@@ -113,6 +113,10 @@ def _verify_project(root: Path) -> None:
 def _python_context() -> tuple[Path, dict[str, object]]:
     python = Path(sys.executable).resolve()
     package_dir = Path(_native_extension.__file__).resolve().parent
+    if sys.version_info < (3, 10):
+        raise RuntimeError(
+            "pyferrum requires CPython 3.10 or newer"
+        )
     abi3_suffix = next(
         (suffix for suffix in importlib.machinery.EXTENSION_SUFFIXES if suffix.startswith(".abi3.")),
         None,
@@ -179,6 +183,20 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
                 if isinstance(dependency_value, str)
                 else dict(dependency_value)
             )
+            package_name = str(fields.get("package", dependency_name))
+            if (
+                dependency_name in {"ferrum-core", "pyferrum-sdk"}
+                or package_name in {"ferrum-core", "pyferrum-sdk"}
+            ):
+                has_ferrum_core = True
+                fields = {"package": "pyferrum-sdk", "path": str(sdk)}
+                output_section = cargo_section
+                if target:
+                    output_section = f"target.{json.dumps(target)}.{cargo_section}"
+                sections.setdefault(output_section, []).append(
+                    f"{json.dumps(dependency_name)} = {_toml_value(fields)}"
+                )
+                continue
             inherited = bool(fields.pop("workspace", False))
             if inherited:
                 workspace_value = workspace.get("dependencies", {}).get(dependency_name)
@@ -192,13 +210,7 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
                     else dict(workspace_value)
                 )
             package_name = str(fields.get("package", dependency_name))
-            if (
-                dependency_name in {"ferrum-core", "pyferrum-sdk"}
-                or package_name in {"ferrum-core", "pyferrum-sdk"}
-            ):
-                has_ferrum_core = True
-                fields = {"package": "pyferrum-sdk", "path": str(sdk)}
-            elif fields.get("path"):
+            if fields.get("path"):
                 base = workspace_root if inherited and workspace_root else manifest.parent
                 fields["path"] = str((base / str(fields["path"])).resolve())
             output_section = cargo_section
@@ -220,7 +232,7 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
             f'"ferrum-core" = {{ package = "pyferrum-sdk", path = {json.dumps(str(sdk))} }}'
         )
     sections.setdefault("dependencies", []).append(
-        '"pyo3" = { version = "0.29", features = ["extension-module", "abi3-py38"] }'
+        '"pyo3" = { version = "0.29", features = ["extension-module", "abi3-py310"] }'
     )
     return "\n".join(
         f"[{section}]\n" + "\n".join(entries)

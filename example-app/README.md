@@ -117,6 +117,12 @@ when `app.py` creates its `Ferrum` instance. Rust routes are defined only in
 in the active Python environment, but does not require a virtual environment
 or produce a wheel. A venv remains an optional way to isolate that environment.
 The pip-installed Rust plugin SDK is used to compile the route code.
+The SDK package location is resolved dynamically by `pyferrum build` from
+the active Python environment. It does not require a hardcoded
+`site-packages` path or a source-checkout path. The example manifest uses
+Cargo workspace inheritance in the repository and `pyferrum build` replaces
+that dependency with `pyferrum/_pyferrum_sdk` from the installed wheel or
+virtual environment.
 
 The separate shared-library plugin workflow remains available below:
 

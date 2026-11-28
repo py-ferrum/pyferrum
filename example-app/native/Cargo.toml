@@ -7,6 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyferrum-sdk = { path = "../../python/pyferrum/_pyferrum_sdk" }
-
-[workspace]
+pyferrum-sdk = { workspace = true }

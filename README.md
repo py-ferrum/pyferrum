@@ -24,9 +24,8 @@ rustc --version
 cargo --version
 ```
 
-pyferrum supports **CPython 3.10 and newer**. Its abi3 extension targets
-CPython 3.8, while CI tests every supported minor version from 3.10 through
-3.15. PyPy is not a supported runtime.
+pyferrum supports **CPython 3.10 and newer(3.15)**. 
+PyPy is not a supported runtime.
 
 Releases provide prebuilt wheels for Linux and Windows, but not macOS. On
 macOS, `pip` builds the extension from source, so install Rust with Cargo and
@@ -124,9 +123,14 @@ virtual environment. Rust routes are registered automatically when the app
 creates a `Ferrum` instance. The build requires Rust/Cargo and pyferrum
 installed in the active Python environment. The SDK used to compile route
 crates is bundled with pyferrum; the full ferrum-core source checkout is not
-needed. Native route code runs in process with the server's privileges and
-must be trusted. `pyferrum run` uses that extension until rebuilt or run with
-`--core`.
+needed. It is installed as `_pyferrum_sdk/` inside the active
+`pyferrum` Python package (normally
+`site-packages/pyferrum/_pyferrum_sdk`) and `pyferrum build` resolves that
+absolute path automatically. Application `Cargo.toml` files should use a normal
+`pyferrum-sdk` dependency (or omit it when the CLI injects SDK types);
+the build command dynamically rewrites it to the SDK in the active installation.
+Native route code runs in process with the server's privileges and must be
+trusted. `pyferrum run` uses that extension until rebuilt or run with `--core`.
 
 `--debug` enables detailed server logging by setting `RUST_LOG=debug`; it
 does not return Python tracebacks to clients. Otherwise, `RUST_LOG` controls

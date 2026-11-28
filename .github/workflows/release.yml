@@ -22,7 +22,7 @@ env:
 jobs:
   # ----------------------------------------------------------------------
   # Build wheels for every supported platform.
-  # PyO3 abi3-py38 means ONE wheel works on CPython 3.8 through 3.13+
+  # PyO3 abi3-py310 means ONE wheel works on CPython 3.10 and newer
   # — no per-Python-version matrix needed.
   # ----------------------------------------------------------------------
   build:
@@ -63,8 +63,8 @@ jobs:
           target: ${{ matrix.target.target }}
           args: --release --out dist ${{ matrix.target.manylinux == 'musllinux_1_2' && '--auditwheel=skip' || '' }}
           manylinux: ${{ matrix.target.manylinux }}
-          # Build the abi3 wheel — one wheel for all CPython 3.8+ versions.
-          # Maturin reads the abi3-py38 feature from pyproject.toml.
+          # Build the abi3 wheel — one wheel for all CPython 3.10+ versions.
+          # Maturin reads the abi3-py310 feature from pyproject.toml.
           before-script-linux: |
             # No-op for manylinux; maturin-action handles the toolchain.
 

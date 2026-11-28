@@ -37,6 +37,8 @@ Notable changes are recorded here. This project follows
 
 - Python package, Rust workspace, core crate, and bundled SDK version set to
   `1.1.0`.
+- CPython abi3 extension targeting CPython 3.10 and newer. This raises the
+  binary ABI floor to match the project's `requires-python >=3.10` declaration.
 - The SDK and example native route source are included in source distributions;
   route builds can use the bundled SDK without a ferrum-core checkout.
 
@@ -73,8 +75,7 @@ frameworks or feature parity with FastAPI, Flask, or Django.
 
 - Python package and Rust workspace version set to `1.0.0`.
 - MIT License; this project is not dual-licensed under Apache-2.0.
-- CPython abi3 extension targeting CPython 3.8 and newer. CI tests CPython
-  3.8, 3.10, 3.12, and 3.13.
+- CPython abi3 extension targeting CPython 3.8 and newer at the 1.0.0 release.
 
 ### Limitations
 
