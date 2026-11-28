@@ -50,15 +50,11 @@ def _compile_project(root: Path) -> None:
             py_compile.compile(str(path), doraise=True)
 
 
-def _rust_route_project(
-    root: Path, required: bool = False
-) -> tuple[Path, dict, Path] | None:
+def _rust_route_project(root: Path, required: bool = False) -> tuple[Path, dict, Path] | None:
     config = root / "config.toml"
     if not config.is_file():
         if required:
-            raise ValueError(
-                "pyferrum build requires [rust.native].manifest in config.toml"
-            )
+            raise ValueError("pyferrum build requires [rust.native].manifest in config.toml")
         return None
     with config.open("rb") as file:
         config_doc = tomllib.load(file)
@@ -68,18 +64,14 @@ def _rust_route_project(
     native_config = rust_config.get("native")
     if native_config is None:
         if required:
-            raise ValueError(
-                "pyferrum build requires [rust.native].manifest in config.toml"
-            )
+            raise ValueError("pyferrum build requires [rust.native].manifest in config.toml")
         return None
     if not isinstance(native_config, dict):
         raise ValueError("[rust.native] must be a table in config.toml")
     manifest_value = native_config.get("manifest")
     if manifest_value is None:
         if required:
-            raise ValueError(
-                "pyferrum build requires [rust.native].manifest in config.toml"
-            )
+            raise ValueError("pyferrum build requires [rust.native].manifest in config.toml")
         return None
     if not isinstance(manifest_value, str) or not manifest_value:
         raise ValueError("[rust.native].manifest must be a non-empty path")
@@ -113,12 +105,12 @@ def _verify_project(root: Path) -> None:
 def _python_context() -> tuple[Path, dict[str, object]]:
     python = Path(sys.executable).resolve()
     package_dir = Path(_native_extension.__file__).resolve().parent
-    if sys.version_info < (3, 10):
-        raise RuntimeError(
-            "pyferrum requires CPython 3.10 or newer"
-        )
     abi3_suffix = next(
-        (suffix for suffix in importlib.machinery.EXTENSION_SUFFIXES if suffix.startswith(".abi3.")),
+        (
+            suffix
+            for suffix in importlib.machinery.EXTENSION_SUFFIXES
+            if suffix.startswith(".abi3.")
+        ),
         None,
     )
     if not python.is_file():
@@ -146,9 +138,13 @@ def _toml_value(value: object) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(_toml_value(item) for item in value) + "]"
     if isinstance(value, dict):
-        return "{ " + ", ".join(
-            f"{json.dumps(str(key))} = {_toml_value(item)}" for key, item in value.items()
-        ) + " }"
+        return (
+            "{ "
+            + ", ".join(
+                f"{json.dumps(str(key))} = {_toml_value(item)}" for key, item in value.items()
+            )
+            + " }"
+        )
     raise ValueError(f"unsupported Cargo dependency value: {value!r}")
 
 
@@ -184,10 +180,10 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
                 else dict(dependency_value)
             )
             package_name = str(fields.get("package", dependency_name))
-            if (
-                dependency_name in {"ferrum-core", "pyferrum-sdk"}
-                or package_name in {"ferrum-core", "pyferrum-sdk"}
-            ):
+            if dependency_name in {"ferrum-core", "pyferrum-sdk"} or package_name in {
+                "ferrum-core",
+                "pyferrum-sdk",
+            }:
                 has_ferrum_core = True
                 fields = {"package": "pyferrum-sdk", "path": str(sdk)}
                 output_section = cargo_section
@@ -201,9 +197,7 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
             if inherited:
                 workspace_value = workspace.get("dependencies", {}).get(dependency_name)
                 if workspace_value is None:
-                    raise ValueError(
-                        f"workspace dependency {dependency_name!r} is not defined"
-                    )
+                    raise ValueError(f"workspace dependency {dependency_name!r} is not defined")
                 fields = (
                     {"version": workspace_value}
                     if isinstance(workspace_value, str)
@@ -234,10 +228,7 @@ def _native_extension_dependencies(manifest_doc: dict, manifest: Path, sdk: Path
     sections.setdefault("dependencies", []).append(
         '"pyo3" = { version = "0.29", features = ["extension-module", "abi3-py310"] }'
     )
-    return "\n".join(
-        f"[{section}]\n" + "\n".join(entries)
-        for section, entries in sections.items()
-    )
+    return "\n".join(f"[{section}]\n" + "\n".join(entries) for section, entries in sections.items())
 
 
 def _stream_cargo_build(
@@ -319,7 +310,7 @@ def _custom_route_build(root: Path) -> Path:
     )
     (project_dir / "Cargo.toml").write_text(cargo_manifest, encoding="utf-8")
     (project_dir / "src" / "lib.rs").write_text(
-        f'#[path = {json.dumps(route_source.as_posix())}]\n'
+        f"#[path = {json.dumps(route_source.as_posix())}]\n"
         "mod native_routes;\n\n"
         "use pyo3::prelude::*;\n"
         "use pyo3::types::PyModule;\n\n"
@@ -351,9 +342,7 @@ def _custom_route_build(root: Path) -> Path:
         str(project_dir / "Cargo.toml"),
         "--message-format=json-render-diagnostics",
     ]
-    returncode, artifacts = _stream_cargo_build(
-        command, str(project_dir), build_env
-    )
+    returncode, artifacts = _stream_cargo_build(command, str(project_dir), build_env)
     if returncode:
         raise RuntimeError(f"custom Rust route build failed with status {returncode}")
     if len(artifacts) != 1:
@@ -578,8 +567,7 @@ def main(argv: list[str] | None = None) -> int:
         "build",
         help="build Rust routes configured in config.toml",
         description=(
-            "Build and install the custom extension using "
-            "[rust.native].manifest from config.toml."
+            "Build and install the custom extension using [rust.native].manifest from config.toml."
         ),
     )
     args = parser.parse_args(argv)

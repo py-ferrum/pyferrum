@@ -108,9 +108,7 @@ class CliTests(unittest.TestCase):
 
     def test_run_does_not_build_or_verify_by_default(self):
         (self.root / "app.py").write_text(_app("no-build"))
-        (self.root / "config.toml").write_text(
-            '[rust.native]\nmanifest = "missing/Cargo.toml"\n'
-        )
+        (self.root / "config.toml").write_text('[rust.native]\nmanifest = "missing/Cargo.toml"\n')
         port = _port()
         log = self.root / "server.log"
         with log.open("w") as output:
@@ -349,9 +347,7 @@ class CliTests(unittest.TestCase):
         log = self.root / "server.log"
         with log.open("w") as output:
             self.process = subprocess.Popen(
-                self.command(
-                    "run", "app:app", "--port", str(port), "--dev", "--verify", "--debug"
-                ),
+                self.command("run", "app:app", "--port", str(port), "--dev", "--verify", "--debug"),
                 cwd=self.root,
                 env=self.env,
                 stdout=output,
@@ -507,7 +503,7 @@ class CliTests(unittest.TestCase):
             "import sys\n"
             "command = [sys.executable, '-c', "
             "\"print('Compiling live-output', flush=True); "
-            "import time; time.sleep(1)\"]\n"
+            'import time; time.sleep(1)"]\n'
             "returncode, _ = _stream_cargo_build(command, '.', dict(__import__('os').environ))\n"
             "raise SystemExit(returncode)\n"
         )
@@ -648,14 +644,11 @@ class CliTests(unittest.TestCase):
             ignore=shutil.ignore_patterns("target"),
         )
         (self.root / "app.py").write_text(_app("Hello from Python"))
-        (self.root / "config.toml").write_text(
-            '[rust.native]\nmanifest = "native/Cargo.toml"\n'
-        )
+        (self.root / "config.toml").write_text('[rust.native]\nmanifest = "native/Cargo.toml"\n')
         manifest = self.root / "native" / "Cargo.toml"
         manifest.write_text(
-            manifest.read_text().replace(
-                "../../crates/ferrum-core", (ROOT / "crates" / "ferrum-core").as_posix()
-            )
+            manifest.read_text()
+            .replace("../../crates/ferrum-core", (ROOT / "crates" / "ferrum-core").as_posix())
             .replace(
                 "../../python/pyferrum/_pyferrum_sdk",
                 (ROOT / "python" / "pyferrum" / "_pyferrum_sdk").as_posix(),
@@ -780,9 +773,7 @@ class CliTests(unittest.TestCase):
             library_name = "libnative_plugin.dylib"
         else:
             library_name = "libnative_plugin.so"
-        target = Path(
-            self.env.get("CARGO_TARGET_DIR", self.root / "native" / "target")
-        ).resolve()
+        target = Path(self.env.get("CARGO_TARGET_DIR", self.root / "native" / "target")).resolve()
         library = (target / "debug" / library_name).resolve()
         build_env = {**self.env, "CARGO_TARGET_DIR": str(target)}
         build = subprocess.run(

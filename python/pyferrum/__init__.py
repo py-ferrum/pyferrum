@@ -287,9 +287,7 @@ class Ferrum(_Ferrum):
         ```
     """
 
-    def __init__(
-        self, server_name: str = "pyferrum/1.1", max_python_in_flight: int = 100
-    ) -> None:
+    def __init__(self, server_name: str = "pyferrum/1.1", max_python_in_flight: int = 100) -> None:
         del server_name, max_python_in_flight
         if getattr(_native_extension, "__pyferrum_native_routes__", False):
             self._load_native_routes(str(_native_extension.__file__))
@@ -346,9 +344,7 @@ class Ferrum(_Ferrum):
                 raise ValueError(f"route {index} has unsupported runtime {runtime!r}")
             callable_ = (python_handlers or {}).get(handler)
             if callable_ is None:
-                raise ValueError(
-                    f"route {index} handler {handler!r} was not explicitly supplied"
-                )
+                raise ValueError(f"route {index} handler {handler!r} was not explicitly supplied")
             self._register(method.upper(), path, callable_)
         return len(routes)
 
