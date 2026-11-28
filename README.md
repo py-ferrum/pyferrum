@@ -15,6 +15,15 @@ See the comparison and current limitations below before choosing it.
 
 ## Install
 
+requires rust and cargo stable versions to build source. install and verify with following commands.
+```bash
+sudo apt update && sudo apt install -y build-essential curl
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustc --version
+cargo --version
+```
+
 pyferrum supports **CPython 3.10 and newer**. Its abi3 extension targets
 CPython 3.8, while CI tests every supported minor version from 3.10 through
 3.15. PyPy is not a supported runtime.
